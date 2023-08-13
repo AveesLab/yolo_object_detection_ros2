@@ -40,29 +40,27 @@ private:
     void init();
     static std::vector<std::string> objectNames(std::string const filename);
     void runYoloCallback(const ros2_msg::msg::Yoloflag::SharedPtr msg);
-    void precCamImgCallback(const sensor_msgs::msg::Image::SharedPtr msg);
+    void rearCamImgCallback(const sensor_msgs::msg::Image::SharedPtr msg);
     void frontCamImgCallback(const sensor_msgs::msg::Image::SharedPtr msg);
     void publishInThread(std::vector<bbox_t> objects, std::string obj_name);
     void drawBoxes(cv::Mat mat_img, std::vector<bbox_t> objects);
     void recordData(struct timeval startTime);
     void detectInThread();
 
-    // ROS nh, sub, pub
-    //image_transport::Subscriber precCamImgSubscriber_;
-    rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr precCamImgSubscriber_;    
-    //image_transport::Subscriber frontCamImgSubscriber_;
+    /* ROS2 sub */
+    rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr rearCamImgSubscriber_;    
     rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr frontCamImgSubscriber_;    
-    //ros::Subscriber runYoloSubscriber_;
     rclcpp::Subscription<ros2_msg::msg::Yoloflag>::SharedPtr runYoloSubscriber_;
-    //ros::Publisher boundingBoxPublisher_;
+    
+    /* pub */
     rclcpp::Publisher<ros2_msg::msg::Boundingbox>::SharedPtr boundingBoxPublisher_;
 
-    cv::Mat precCamImageCopy_;
+    cv::Mat rearCamImageCopy_;
     cv::Mat frontCamImageCopy_;
     bool imageStatus_ = false;
 
     std::thread detectThread_;
-    std::mutex prec_cam_mutex_, front_cam_mutex_;
+    std::mutex rear_cam_mutex_, front_cam_mutex_;
 
     Detector *yoloDetector_; // use smart ptr instead
     std::vector<std::string> objectNames_;
@@ -72,7 +70,8 @@ private:
     std::string cfg_;
     std::string weights_;
 
-    bool run_yolo_ = false;
+    bool f_run_yolo_ = false;
+    bool r_run_yolo_ = false;
     bool viewImage_;
     bool enableConsoleOutput_;
     int waitKeyDelay_;

@@ -24,10 +24,6 @@ bool YoloObjectDetectionNode::readParameters(){
   std::string names_file, cfg_file, weights_file;
   std::string names_path, cfg_path, weights_path;
 
-  // Flag to run YOLO
-  this->get_parameter_or("run_yolo", run_yolo_, false);
-  RCLCPP_INFO(this->get_logger(),"run_yolo: %d", run_yolo_);
-
   // Path to names file
   this->get_parameter_or("yolo_model/names_file/name", names_file, std::string("obj.names"));
   this->get_parameter_or("names_path", names_path, std::string("/default"));
@@ -60,8 +56,8 @@ void YoloObjectDetectionNode::init(){
   gettimeofday(&startTime_, NULL);
 
   // Initialize publisher and subscriber
-  std::string precCamTopicName;
-  int precCamQueueSize;
+  std::string rearCamTopicName;
+  int rearCamQueueSize;
   std::string frontCamTopicName;
   int frontCamQueueSize;
   std::string runYoloTopicName;
@@ -70,27 +66,45 @@ void YoloObjectDetectionNode::init(){
   std::string boundingBoxTopicName;
   int boundingBoxQueueSize;
 
-  // sub
-  this->get_parameter_or("subscribers/prec_camera_reading/topic", precCamTopicName, std::string("/preceding_truck_image"));
-  this->get_parameter_or("subscribers/prec_camera_reading/queue_size", precCamQueueSize, 1);
+  /******************************/
+  /* Ros Topic Subscribe Option */
+  /******************************/
+  this->get_parameter_or("subscribers/rear_camera_reading/topic", rearCamTopicName, std::string("rear_cam/image_raw"));
+  this->get_parameter_or("subscribers/rear_camera_reading/queue_size", rearCamQueueSize, 1);
   this->get_parameter_or("subscribers/front_camera_reading/topic", frontCamTopicName, std::string("usb_cam/image_raw"));
   this->get_parameter_or("subscribers/front_camera_reading/queue_size", frontCamQueueSize, 1);
-  this->get_parameter_or("subscribers/run_yolo_/topic", runYoloTopicName, std::string("/run_yolo_flag"));
+  this->get_parameter_or("subscribers/run_yolo_/topic", runYoloTopicName, std::string("run_yolo_flag"));
   this->get_parameter_or("subscribers/run_yolo_/queue_size", runYoloQueueSize, 1);
   
-  // pub
+  /****************************/
+  /* Ros Topic Publish Option */
+  /****************************/
   this->get_parameter_or("publishers/Boundingbox/topic", boundingBoxTopicName, std::string("/yolo_object_detection/Boundingbox"));
   this->get_parameter_or("publishers/Boundingbox/queue_size", boundingBoxQueueSize, 1);
 
-  yoloDetector_ = new Detector(cfg_, weights_, 0.2f/* thresh*/);
-  objectNames_ = objectNames(names_);
 
-  precCamImgSubscriber_ = this->create_subscription<sensor_msgs::msg::Image>(precCamTopicName, precCamQueueSize, std::bind(&YoloObjectDetectionNode::precCamImgCallback, this, std::placeholders::_1));
-  frontCamImgSubscriber_ = this->create_subscription<sensor_msgs::msg::Image>(frontCamTopicName, frontCamQueueSize, std::bind(&YoloObjectDetectionNode::frontCamImgCallback, this, std::placeholders::_1));
+  /************************/
+  /* Ros Topic Subscriber */
+  /************************/
+  frontCamImgSubscriber_ = this->create_subscription<sensor_msgs::msg::Image>(frontCamTopicName, frontCamQueueSize, std::bind(&YoloObjectDetectionNode::frontCamImgCallback,this, std::placeholders::_1));
+
+  rearCamImgSubscriber_ = this->create_subscription<sensor_msgs::msg::Image>(rearCamTopicName, rearCamQueueSize, std::bind(&YoloObjectDetectionNode::rearCamImgCallback, this, std::placeholders::_1));
+
   runYoloSubscriber_ = this->create_subscription<ros2_msg::msg::Yoloflag>(runYoloTopicName, runYoloQueueSize, std::bind(&YoloObjectDetectionNode::runYoloCallback, this, std::placeholders::_1)); 
+
+  /***********************/
+  /* Ros Topic Publisher */
+  /***********************/
   boundingBoxPublisher_ = this->create_publisher<ros2_msg::msg::Boundingbox>(boundingBoxTopicName, boundingBoxQueueSize);
 
+  /***************/
+  /* Start Setup */
+  /***************/
   cv::Mat img_for_init(width_, height_, CV_8UC3, cv::Scalar(0,0,0)); 
+
+  objectNames_ = objectNames(names_);
+
+  yoloDetector_ = new Detector(cfg_, weights_, 0.2f/* thresh*/);
   yoloDetector_->detect(img_for_init);
 
   detectThread_ = std::thread(&YoloObjectDetectionNode::detectInThread, this);
@@ -108,14 +122,13 @@ std::vector<std::string> YoloObjectDetectionNode::objectNames(std::string const 
 }
 
 void YoloObjectDetectionNode::runYoloCallback(const ros2_msg::msg::Yoloflag::SharedPtr msg){
-  if (!run_yolo_){
-    run_yolo_ = msg->run_yolo;
-  }
+  f_run_yolo_ = msg->f_run_yolo;
+  r_run_yolo_ = msg->r_run_yolo;
 }
 
-void YoloObjectDetectionNode::precCamImgCallback(const sensor_msgs::msg::Image::SharedPtr msg)
+void YoloObjectDetectionNode::rearCamImgCallback(const sensor_msgs::msg::Image::SharedPtr msg)
 {
-  if (run_yolo_){
+  if (r_run_yolo_){
     cv_bridge::CvImagePtr cv_ptr;
   
     try {
@@ -127,9 +140,9 @@ void YoloObjectDetectionNode::precCamImgCallback(const sensor_msgs::msg::Image::
     }
   
     if (cv_ptr) {
-      std::scoped_lock lock(prec_cam_mutex_);
-      precCamImageCopy_ = cv_ptr->image.clone();
-      resize(precCamImageCopy_, precCamImageCopy_, cv::Size(width_, height_));
+      std::scoped_lock lock(rear_cam_mutex_);
+      rearCamImageCopy_ = cv_ptr->image.clone();
+      resize(rearCamImageCopy_, rearCamImageCopy_, cv::Size(width_, height_));
       sec_ = msg->header.stamp.sec;
       nsec_ = msg->header.stamp.nanosec;
     }
@@ -138,7 +151,7 @@ void YoloObjectDetectionNode::precCamImgCallback(const sensor_msgs::msg::Image::
 
 void YoloObjectDetectionNode::frontCamImgCallback(const sensor_msgs::msg::Image::SharedPtr msg)
 {
-  if (run_yolo_){
+  if (f_run_yolo_){
     cv_bridge::CvImagePtr cv_ptr;
   
     try {
@@ -166,12 +179,12 @@ void YoloObjectDetectionNode::detectInThread()
   uint8_t mark = 0;
   while(rclcpp::ok()){
     objects_.clear();
-    if (run_yolo_){
+    if (f_run_yolo_ || r_run_yolo_){
       {
-        std::scoped_lock lock(prec_cam_mutex_, front_cam_mutex_);
+        std::scoped_lock lock(rear_cam_mutex_, front_cam_mutex_);
         std::string obj_name;
-        if (!precCamImageCopy_.empty()) {
-          objects_ = yoloDetector_->detect(precCamImageCopy_);
+        if (!rearCamImageCopy_.empty()) {
+          objects_ = yoloDetector_->detect(rearCamImageCopy_);
 //          gettimeofday(&endTime, NULL);
 //          cnt++;
 //          time += ((endTime.tv_sec - sec) * 1000.0) + ((endTime.tv_usec - nsec) / 1000.0); //ms
@@ -198,12 +211,15 @@ void YoloObjectDetectionNode::detectInThread()
     
         if (viewImage_ && mark != 0) {
           cv::Mat draw_img;
-          if (mark == 1) draw_img = precCamImageCopy_.clone();
+
+          if (mark == 1) draw_img = rearCamImageCopy_.clone();
 	  else if (mark == 2) draw_img = frontCamImageCopy_.clone();
+
           drawBoxes(draw_img, objects_);
-          cv::namedWindow("YOLO");
-          cv::moveWindow("YOLO", 1280,520);
+
           if (!draw_img.empty()) {
+            cv::namedWindow("YOLO");
+            cv::moveWindow("YOLO", 1280,520);
             cv::imshow("YOLO", draw_img);
             cv::waitKey(waitKeyDelay_);
           }
@@ -292,7 +308,7 @@ void YoloObjectDetectionNode::recordData(struct timeval startTime){
     gettimeofday(&currentTime, NULL);
     diff_time = ((currentTime.tv_sec - startTime.tv_sec)) + ((currentTime.tv_usec - startTime.tv_usec)/1000000.0);
     {
-      std::scoped_lock lock(prec_cam_mutex_);
+      std::scoped_lock lock(rear_cam_mutex_);
       sprintf(buf, "%.10e, %.10e", diff_time, delay_);
     }
     write_file.open(file, std::ios::out | std::ios::app);

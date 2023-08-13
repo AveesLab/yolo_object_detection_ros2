@@ -15,10 +15,10 @@
     image_view/wait_key_delay: 1
     image_view/enable_console_output: false
 
-    subscribers/prec_camera_reading/topic: preceding_truck_image
-    subscribers/prec_camera_reading/queue_size: 1
-    subscribers/front_camera_reading/topic: rear_cam/image_raw
+    subscribers/front_camera_reading/topic: usb_cam/image_raw
     subscribers/front_camera_reading/queue_size: 1
+    subscribers/rear_camera_reading/topic: rear_cam/image_raw
+    subscribers/rear_camera_reading/queue_size: 1
     subscribers/run_yolo_/topic: run_yolo_flag
     subscribers/run_yolo_/queue_size: 1
 
