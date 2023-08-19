@@ -227,6 +227,11 @@ void YoloObjectDetectionNode::detectInThread()
       }
 //      recordData(startTime_);
     }
+    else {
+      std::string obj_name = "";
+      publishInThread(objects_, obj_name);
+    }
+
     std::this_thread::sleep_for(std::chrono::milliseconds(2));
   }
 }
