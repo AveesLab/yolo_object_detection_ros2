@@ -183,20 +183,12 @@ void YoloObjectDetectionNode::detectInThread()
       {
         std::scoped_lock lock(rear_cam_mutex_, front_cam_mutex_);
         std::string obj_name;
-        if (!rearCamImageCopy_.empty()) {
+
+        if (!rearCamImageCopy_.empty() && r_run_yolo_) {
           objects_ = yoloDetector_->detect(rearCamImageCopy_);
-//          gettimeofday(&endTime, NULL);
-//          cnt++;
-//          time += ((endTime.tv_sec - sec) * 1000.0) + ((endTime.tv_usec - nsec) / 1000.0); //ms
-//          delay_ = time / (double)cnt;
-//          if (cnt > 3000){
-//            time = 0.0;
-//            cnt = 0;
-//          }
-//          delay_ = ((endTime.tv_sec - sec_) * 1000.0) + ((endTime.tv_usec - nsec_) / 1000.0); //ms   
           mark = 1;
         }
-        else if (!frontCamImageCopy_.empty()) {
+        else if (!frontCamImageCopy_.empty() && f_run_yolo_) {
           objects_ = yoloDetector_->detect(frontCamImageCopy_);
 	  mark = 2;
         }
@@ -216,6 +208,8 @@ void YoloObjectDetectionNode::detectInThread()
 	  else if (mark == 2) draw_img = frontCamImageCopy_.clone();
 
           drawBoxes(draw_img, objects_);
+	  RCLCPP_INFO(this->get_logger(), "mark : %d\n", mark);
+
 
           if (!draw_img.empty()) {
             cv::namedWindow("YOLO");
