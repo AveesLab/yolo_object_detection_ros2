@@ -172,62 +172,65 @@ void YoloObjectDetectionNode::frontCamImgCallback(const sensor_msgs::msg::Image:
 
 void YoloObjectDetectionNode::detectInThread()
 {
-  RCLCPP_INFO(this->get_logger(),"detectInThread Start");
-  struct timeval endTime;
-  static double time = 0.0;
-//  static int cnt = 0;
-  uint8_t mark = 0;
-  while(rclcpp::ok()){
-    objects_.clear();
-    if (f_run_yolo_ || r_run_yolo_){
-      {
-        std::scoped_lock lock(rear_cam_mutex_, front_cam_mutex_);
-        std::string obj_name;
+	RCLCPP_INFO(this->get_logger(),"detectInThread Start");
+	struct timeval endTime;
+	static double time = 0.0;
+	//  static int cnt = 0;
+	uint8_t mark = 0;
+	while(rclcpp::ok()){
+		objects_.clear();
+		if (f_run_yolo_ || r_run_yolo_){
+			{
+				std::scoped_lock lock(rear_cam_mutex_, front_cam_mutex_);
+				std::string obj_name;
 
-        if (!rearCamImageCopy_.empty() && r_run_yolo_) {
-          objects_ = yoloDetector_->detect(rearCamImageCopy_);
-          mark = 1;
-        }
-        else if (!frontCamImageCopy_.empty() && f_run_yolo_) {
-          objects_ = yoloDetector_->detect(frontCamImageCopy_);
-	  mark = 2;
-        }
+				if (!rearCamImageCopy_.empty() && r_run_yolo_) {
+					objects_ = yoloDetector_->detect(rearCamImageCopy_);
+					mark = 1;
+				}
+				else if (!frontCamImageCopy_.empty() && f_run_yolo_) {
+					objects_ = yoloDetector_->detect(frontCamImageCopy_);
+					mark = 2;
+				}
 
-        for(auto &i : objects_){
-          if(objectNames_.size() > i.obj_id){
-            obj_name = objectNames_[i.obj_id];
-	  }
+				for(auto &i : objects_){
+					if(objectNames_.size() > i.obj_id){
+						obj_name = objectNames_[i.obj_id];
+					}
+				}
+
+				if (obj_name.empty()) {
+					obj_name = "no_object";
+				}
+
+				publishInThread(objects_, obj_name);
+
+				if (viewImage_ && mark != 0) {
+					cv::Mat draw_img;
+
+					if (mark == 1) draw_img = rearCamImageCopy_.clone();
+					else if (mark == 2) draw_img = frontCamImageCopy_.clone();
+
+					drawBoxes(draw_img, objects_);
+
+
+					if (!draw_img.empty()) {
+						cv::namedWindow("YOLO");
+						cv::moveWindow("YOLO", 1280,520);
+						cv::imshow("YOLO", draw_img);
+						cv::waitKey(waitKeyDelay_);
+					}
+				}
+			}
+			//      recordData(startTime_);
+		}
+		else {
+			std::string obj_name = "Not_run_yolo";
+			publishInThread(objects_, obj_name);
+		}
+
+		std::this_thread::sleep_for(std::chrono::milliseconds(2));
 	}
-
-        publishInThread(objects_, obj_name);
-    
-        if (viewImage_ && mark != 0) {
-          cv::Mat draw_img;
-
-          if (mark == 1) draw_img = rearCamImageCopy_.clone();
-	  else if (mark == 2) draw_img = frontCamImageCopy_.clone();
-
-          drawBoxes(draw_img, objects_);
-	  RCLCPP_INFO(this->get_logger(), "mark : %d\n", mark);
-
-
-          if (!draw_img.empty()) {
-            cv::namedWindow("YOLO");
-            cv::moveWindow("YOLO", 1280,520);
-            cv::imshow("YOLO", draw_img);
-            cv::waitKey(waitKeyDelay_);
-          }
-        }
-      }
-//      recordData(startTime_);
-    }
-    else {
-      std::string obj_name = "";
-      publishInThread(objects_, obj_name);
-    }
-
-    std::this_thread::sleep_for(std::chrono::milliseconds(2));
-  }
 }
 
 void YoloObjectDetectionNode::publishInThread(std::vector<bbox_t> objects, std::string obj_name)
