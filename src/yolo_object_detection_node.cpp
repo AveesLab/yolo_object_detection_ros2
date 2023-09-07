@@ -213,10 +213,10 @@ void YoloObjectDetectionNode::detectInThread()
 
 					drawBoxes(draw_img, objects_);
 
-
 					if (!draw_img.empty()) {
 						cv::namedWindow("YOLO");
-						cv::moveWindow("YOLO", 1280,520);
+						if(mark == 1)	cv::moveWindow("YOLO", 1280,520);
+						else if(mark == 2)	cv::moveWindow("YOLO", 600,520);
 						cv::imshow("YOLO", draw_img);
 						cv::waitKey(waitKeyDelay_);
 					}
