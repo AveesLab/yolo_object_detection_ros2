@@ -1,5 +1,5 @@
 GPU=1
-CUDNN=0
+CUDNN=1
 CUDNN_HALF=0
 OPENCV=1
 AVX=0
@@ -36,6 +36,9 @@ OS := $(shell uname)
 
 # Jetson XAVIER
 ARCH= -gencode arch=compute_72,code=[sm_72,compute_72]
+
+# Jetson Orin
+ARCH= -gencode arch=compute_87,code=[sm_87,compute_87]
 
 # GTX 1080, GTX 1070, GTX 1060, GTX 1050, GTX 1030, Titan Xp, Tesla P40, Tesla P4
 # ARCH= -gencode arch=compute_61,code=sm_61 -gencode arch=compute_61,code=compute_61
