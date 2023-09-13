@@ -18,11 +18,6 @@ def generate_launch_description():
             'config',
             'cam_params.yaml')
             
-#    lane_param_file = os.path.join(
-#            get_package_share_directory('scale_truck_control_ros2'),
-#            'config',
-#            'LV.yaml')
-
     yolo_param_file = os.path.join(
             get_package_share_directory('yolo_object_detection_ros2'),
             'config',
@@ -33,16 +28,6 @@ def generate_launch_description():
             package='usb_cam',
             namespace='FV1',
             name='usb_cam',
-            executable='usb_cam_node_exe',
-            parameters = [ros_param_file],
-            remappings=[('image_raw', 'usb_cam/image_raw')],
-            output='screen')
-
-    # start rear_cam
-    rear_cam_node=Node(
-            package='usb_cam',
-            namespace='LV',
-            name='rear_cam',
             executable='usb_cam_node_exe',
             parameters = [ros_param_file],
             remappings=[('image_raw', 'usb_cam/image_raw')],
@@ -60,7 +45,6 @@ def generate_launch_description():
     ld = LaunchDescription()
 
     ld.add_action(front_cam_node)
-#    ld.add_action(rear_cam_node)
     ld.add_action(darknet_node)
 
     return ld
