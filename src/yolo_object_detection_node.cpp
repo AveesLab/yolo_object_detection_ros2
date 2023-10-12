@@ -145,6 +145,7 @@ void YoloObjectDetectionNode::rearCamImgCallback(const sensor_msgs::msg::Image::
       resize(rearCamImageCopy_, rearCamImageCopy_, cv::Size(width_, height_));
       sec_ = msg->header.stamp.sec;
       nsec_ = msg->header.stamp.nanosec;
+      rearImageStatus_ = true;
     }
   }
 }
@@ -166,6 +167,7 @@ void YoloObjectDetectionNode::frontCamImgCallback(const sensor_msgs::msg::Image:
       std::scoped_lock lock(front_cam_mutex_);
       frontCamImageCopy_ = cv_ptr->image.clone();
       resize(frontCamImageCopy_, frontCamImageCopy_, cv::Size(width_, height_));
+      ImageStatus_ = true;
     }
   }
 }
@@ -179,18 +181,20 @@ void YoloObjectDetectionNode::detectInThread()
   uint8_t mark = 0;
   while(rclcpp::ok()){
     objects_.clear();
-    if (f_run_yolo_ || r_run_yolo_){
+    if (ImageStatus_ || rearImageStatus_){
       {
         std::scoped_lock lock(rear_cam_mutex_, front_cam_mutex_);
         std::string obj_name;
 
-        if (!rearCamImageCopy_.empty() && r_run_yolo_) {
+        if (rearImageStatus_) {
           objects_ = yoloDetector_->detect(rearCamImageCopy_);
           mark = 1;
+          ImageStatus_ = false;
         }
-        else if (!frontCamImageCopy_.empty() && f_run_yolo_) {
+        else if (ImageStatus_) {
           objects_ = yoloDetector_->detect(frontCamImageCopy_);
           mark = 2;
+          rearImageStatus_ = false;
         }
 
         for(auto &i : objects_){
