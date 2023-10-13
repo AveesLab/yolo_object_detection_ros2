@@ -70,6 +70,8 @@ private:
     std::string cfg_;
     std::string weights_;
 
+    bool ImageStatus_ = false;
+    bool rearImageStatus_ = false;
     bool f_run_yolo_ = false;
     bool r_run_yolo_ = false;
     bool viewImage_;
